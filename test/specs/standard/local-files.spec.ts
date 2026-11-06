@@ -1,5 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
+import { pathToFileURL } from "node:url"
+import { browser } from "@wdio/globals"
 import parseTorrent from "parse-torrent"
 import * as e2e from "../../e2e"
 import { eventually } from "../../e2e/eventually"
@@ -96,6 +98,35 @@ describe("local files", function () {
       }
       await this.app.settingsSave()
       await this.app.torrentsPageIsVisible()
+    }
+  })
+
+  it("uploads torrent files passed to a running instance as file URIs", async function () {
+    this.timeout(90 * 1000)
+
+    const torrentPath = await createTorrentFile(tracker, { fileSize: 1 })
+    const launchPath = path.join(path.dirname(torrentPath), `${createUniqueLabel("file uri [launch]")}.torrent`)
+    const launchUri = pathToFileURL(launchPath).href
+    const torrentInfo = parseTorrent(fs.readFileSync(torrentPath))
+    const torrent = new e2e.Torrent({ hash: torrentInfo.infoHash, app: this.app })
+
+    fs.copyFileSync(torrentPath, launchPath)
+
+    try {
+      await restartApplication(this)
+      await this.app.torrentsPageIsVisible()
+
+      await browser.electron.execute((electron, uri) => {
+        electron.app.emit("second-instance", {}, [uri])
+      }, launchUri)
+
+      await torrent.waitForExist({ timeout: 30 * 1000 })
+    } finally {
+      if (await torrent.isExisting()) {
+        await torrent.delete()
+      }
+
+      fs.rmSync(launchPath, { force: true })
     }
   })
 })

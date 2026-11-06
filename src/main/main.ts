@@ -15,6 +15,7 @@ import is from 'electron-is'
 import path from 'path'
 import yargs from 'yargs'
 
+import { launchArgToPath } from '@main/lib/launch-args'
 import startup, { configureSystemStartup, shouldStartInBackground } from '@main/lib/startup'
 import type { PendingTorrentUploadLink } from '@shared/ipc-contract'
 
@@ -379,7 +380,10 @@ async function bootstrap() {
     }
 
     function getTorrentFilePaths(args: string[]): string[] {
-        return args.filter(isTorrentFilePath)
+        return args
+            .filter(isTorrentFilePath)
+            .map(launchArgToPath)
+            .filter((filePath): filePath is string => filePath !== null)
     }
 
     function queuePendingLaunchArgs(args: string[]) {
